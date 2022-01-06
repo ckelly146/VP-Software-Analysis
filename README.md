@@ -2,7 +2,7 @@
 
 Example of code
 
-For LIRICAL (1 VP Software I am testing), the pipeline is as follows:
+For LIRICAL (1 of the 5 VP Software I am testing), the pipeline is as follows:
 
 1. Create 132 Phenopackets based on patient VCFs and corresponding HPO terms 
 2. Run LIRICAL on phenopackets
