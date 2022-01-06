@@ -1,6 +1,8 @@
 # VP-Software-Analysis
 
-Example of code:
+Example of code
+
+For LIRICAL (1 VP Software I am testing), the pipeline is as follows:
 
 1. Create 132 Phenopackets based on patient VCFs and corresponding HPO terms 
 2. Run LIRICAL on phenopackets
