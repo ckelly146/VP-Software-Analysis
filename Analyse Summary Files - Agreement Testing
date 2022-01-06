@@ -1,0 +1,284 @@
+install.packages(c("fmsb",'DescTools'), repos = 'https://cran.ma.imperial.ac.uk/')
+
+
+### Import data ################################################################
+
+# import amelie summary
+amelie <- read.csv(file = "ameliesummary.csv", header = TRUE)
+# import exomiser summary
+exomiser <- read.csv(file = "exomisersummary.csv", header = TRUE)
+# import lirical summary
+lirical <- read.csv(file = "liricalsummary.csv", header = TRUE)
+# import phenix summary
+phenix <- read.csv(file = "phenixsummary.csv", header = TRUE)
+# import xrare summary
+xrare <- read.csv(file = "xraresummary.csv", header = TRUE)
+
+
+### Wilcoxon Signed-Rank Test ##################################################
+
+## Using the Wilcoxon Signed-Rank Test, we can decide whether the corresponding
+# matched dataset distributions are identical without assuming them to follow
+# the normal distribution = (test is not parametric because not expected to be
+# normally distributed).
+
+## Problem: Without assuming data to have normal distribution, test at .05
+# significance level if the variants for each settings have identical data
+# distributions.
+
+## Null hypoth: the 2 settings have identical populations of data.
+
+# import MASS package
+library(MASS)
+
+# running exomiser vs amelie
+phen_vs_ame <- wilcox.test(phenix$highestRanking, amelie$correct_gene_rank, paired=TRUE, conf.int = TRUE)
+phen_vs_ame
+
+# running exomiser vs phenix
+phen_vs_exom <- wilcox.test(phenix$highestRanking, exomiser$highestRanking, paired=TRUE, conf.int = TRUE)
+phen_vs_exom
+
+# running phenix vs lirical
+phen_vs_liric <- wilcox.test(phenix$highestRanking, lirical$highestRanking, paired=TRUE, conf.int = TRUE)
+phen_vs_liric
+
+# running phenix vs xrare
+phen_vs_xrare <- wilcox.test(phenix$highestRanking, xrare$rankOfVariant, paired=TRUE, conf.int = TRUE)
+phen_vs_xrare
+
+### CREATING DATAFRAME Wilcoxon Signed-Rank Test ###############################
+
+VPsoftware <- c('AMELIE','Exomiser', 'LIRICAL', 'XRare')
+
+wilcox.pvalues <- c(phen_vs_ame$p.value, phen_vs_exom$p.value, phen_vs_liric$p.value, phen_vs_xrare$p.value)
+wilcox.stat <- c(phen_vs_ame$statistic, phen_vs_exom$statistic, phen_vs_liric$statistic, phen_vs_xrare$statistic)
+wilcox.est <- c(phen_vs_ame$estimate, phen_vs_exom$estimate, phen_vs_liric$estimate, phen_vs_xrare$estimate)
+
+wilcoxtable <- data.frame(VPsoftware, wilcox.pvalues, wilcox.stat, wilcox.est)
+wilcoxtable
+
+# save to csv
+write.csv(wilcoxtable, "wilcoxsignedranktests.csv")
+
+
+### Cohen's kappa values #######################################################
+
+# Measures the agreement between 2 raters e.g. asking children in an interview
+# and a self-administered questionnaire 'Have you ever smoked a cigarette?', do
+# results Yes and No agree. Answer comes in values between less than 0 (poor) up
+# to 1 (which is almost perfect) and in qualitative phrases.
+# https://www.rdocumentation.org/packages/fmsb/versions/0.7.0/topics/Kappa.test
+
+# This does use Landis and Koch measurements
+
+# import packages
+library(fmsb)
+
+## exomiser vs phenix
+
+# import python matrix
+phen_vs_exom_MATRIX <- read.delim(file = "phen_vs_exom_agreeingmatrix.csv",
+                           header = FALSE, sep = ",")
+# remove 1st column because it's just an index column
+phen_vs_exom_MATRIX <- subset(phen_vs_exom_MATRIX, select = -c(V1))
+
+# rename columns and rows
+categories <- c("Top","2-5","6-10",">10","FO/NP")
+dimnames(phen_vs_exom_MATRIX) <- list(PhenIX = categories, Exomiser = categories)
+phen_vs_exom_MATRIX
+
+# add total columns and rows
+#phenix_agree <- cbind(phenix_agree, Total = rowSums(phenix_agree))
+#phenix_agree <- rbind(phenix_agree, Total = colSums(phenix_agree))
+
+# Compute kapa
+res <- Kappa.test(phen_vs_exom_MATRIX)
+
+# p value
+exomp <- res$Result$p.value
+
+# corresponding judgement
+exomj <- res$Judgement
+
+# estimate
+exome <- res$Result$estimate
+
+# statistic
+exoms <- res$Result$statistic
+
+
+## phenix vs lirical
+
+# import python matrix
+phen_vs_liri_MATRIX <- read.delim(file = "phen_vs_lir_agreeingmatrix.csv",
+                                  header = FALSE, sep = ",")
+# remove 1st column because it's just an index column
+phen_vs_liri_MATRIX <- subset(phen_vs_liri_MATRIX, select = -c(V1))
+
+# rename columns and rows
+categories <- c("Top","2-5","6-10",">10","FO/NP")
+dimnames(phen_vs_liri_MATRIX) <- list(PhenIX = categories, LIRICAL = categories)
+phen_vs_liri_MATRIX
+
+# add total columns and rows
+#phenix_agree <- cbind(phenix_agree, Total = rowSums(phenix_agree))
+#phenix_agree <- rbind(phenix_agree, Total = colSums(phenix_agree))
+
+# Compute kapa
+res <- Kappa.test(phen_vs_liri_MATRIX)
+
+# p value
+liricp <- res$Result$p.value
+
+# corresponding judgement
+liricj <- res$Judgement
+
+# estimate
+lirice <- res$Result$estimate
+
+# statistic
+lirics <- res$Result$statistic
+
+
+## phenix vs xrare
+
+# import python matrix
+phen_vs_xrare_MATRIX <- read.delim(file = "phen_vs_xrare_agreeingmatrix.csv",
+                                  header = FALSE, sep = ",")
+# remove 1st column because it's just an index column
+phen_vs_xrare_MATRIX <- subset(phen_vs_xrare_MATRIX, select = -c(V1))
+
+# rename columns and rows
+categories <- c("Top","2-5","6-10",">10","FO/NP")
+dimnames(phen_vs_xrare_MATRIX) <- list(PhenIX = categories, XRare = categories)
+phen_vs_xrare_MATRIX
+
+# add total columns and rows
+#phenix_agree <- cbind(phenix_agree, Total = rowSums(phenix_agree))
+#phenix_agree <- rbind(phenix_agree, Total = colSums(phenix_agree))
+
+# Compute kapa
+res <- Kappa.test(phen_vs_xrare_MATRIX)
+
+# p value
+xrarep <- res$Result$p.value
+
+# corresponding judgement
+xrarej <- res$Judgement
+
+# estimate
+xraree <- res$Result$estimate
+
+# statistic
+xrares <- res$Result$statistic
+
+
+## phenix vs amelie
+
+# import python matrix
+phen_vs_ame_MATRIX <- read.delim(file = "phen_vs_ame_agreeingmatrix.csv",
+                                  header = FALSE, sep = ",")
+# remove 1st column because it's just an index column
+phen_vs_ame_MATRIX <- subset(phen_vs_ame_MATRIX, select = -c(V1))
+
+# rename columns and rows
+categories <- c("Top","2-5","6-10",">10","FO/NP")
+dimnames(phen_vs_ame_MATRIX) <- list(PhenIX = categories, AMELIE = categories)
+phen_vs_ame_MATRIX
+
+# add total columns and rows
+#phenix_agree <- cbind(phenix_agree, Total = rowSums(phenix_agree))
+#phenix_agree <- rbind(phenix_agree, Total = colSums(phenix_agree))
+
+# Compute kapa
+res <- Kappa.test(phen_vs_ame_MATRIX)
+
+# p value
+ameliep <- res$Result$p.value
+
+# corresponding judgement
+ameliej <- res$Judgement
+
+# estimate
+ameliee <- res$Result$estimate
+
+# statistic
+amelies <- res$Result$statistic
+
+### CREATING DATAFRAME Cohen's kappa values ####################################
+
+VPsoftware <- c('AMELIE', 'Exomiser', 'LIRICAL', 'XRare')
+
+kappa.pvalues <- c(ameliep,exomp,liricp,xrarep)
+kappa.term <- c(ameliej,exomj,liricj,xrarej)
+kappa.est <- c(ameliee,exome,lirice,xraree)
+kappa.stat <- c(amelies,exoms,lirics,xrares)
+
+kappatable <- data.frame(VPsoftware, kappa.pvalues, kappa.term, kappa.est, kappa.stat)
+kappatable
+
+# save table as csv
+write.csv(kappatable, "kappatable.csv")
+
+
+### Stuart-Maxwell Test ########################################################
+
+# another nonparametric homogeneity test but this time using p values rather
+# than terms for agreement
+
+# import packages
+library(DescTools)
+
+phen_vs_ame_MATRIX <- as.matrix(phen_vs_ame_MATRIX)
+s1 = StuartMaxwellTest(phen_vs_ame_MATRIX)
+
+phen_vs_exom_MATRIX <- as.matrix(phen_vs_exom_MATRIX)
+s2 = StuartMaxwellTest(phen_vs_exom_MATRIX)
+
+phen_vs_liri_MATRIX <- as.matrix(phen_vs_liri_MATRIX)
+s3 = StuartMaxwellTest(phen_vs_liri_MATRIX)
+
+phen_vs_xrare_MATRIX <- as.matrix(phen_vs_xrare_MATRIX)
+s4 = StuartMaxwellTest(phen_vs_xrare_MATRIX)
+
+### CREATING DATAFRAME Stuart-Maxwell Test #####################################
+
+VPsoftware <- c('AMELIE','Exomiser', 'LIRICAL', 'XRare')
+
+stumax.pvalues <- c(s1$p.value,s2$p.value,s3$p.value,s4$p.value)
+stumax.stat <- c(s1$statistic,s2$statistic,s3$statistic,s4$statistic)
+
+stumaxtable <- data.frame(VPsoftware, stumax.pvalues, stumax.stat)
+stumaxtable
+
+# save table as csv
+write.csv(stumaxtable, "stumaxtable.csv")
+
+
+### % of Agreement #############################################################
+
+exomiser_perc <- (phen_vs_exom_MATRIX['Top','Top'] + phen_vs_exom_MATRIX['2-5','2-5'] + phen_vs_exom_MATRIX['6-10','6-10']
+             + phen_vs_exom_MATRIX['>10','>10'] + phen_vs_exom_MATRIX['FO/NP','FO/NP'])/sum(phen_vs_exom_MATRIX)*100
+
+lirical_perc <- (phen_vs_liri_MATRIX['Top','Top'] + phen_vs_liri_MATRIX['2-5','2-5'] + phen_vs_liri_MATRIX['6-10','6-10']
+              + phen_vs_liri_MATRIX['>10','>10'] + phen_vs_liri_MATRIX['FO/NP','FO/NP'])/sum(phen_vs_liri_MATRIX)*100
+
+xrare_perc <- (phen_vs_xrare_MATRIX['Top','Top'] + phen_vs_xrare_MATRIX['2-5','2-5'] + phen_vs_xrare_MATRIX['6-10','6-10']
+             + phen_vs_xrare_MATRIX['>10','>10'] + phen_vs_xrare_MATRIX['FO/NP','FO/NP'])/sum(phen_vs_xrare_MATRIX)*100
+
+amelie_perc <- (phen_vs_ame_MATRIX['Top','Top'] + phen_vs_ame_MATRIX['2-5','2-5'] + phen_vs_ame_MATRIX['6-10','6-10']
+            + phen_vs_ame_MATRIX['>10','>10'] + phen_vs_ame_MATRIX['FO/NP','FO/NP'])/sum(phen_vs_ame_MATRIX)*100
+
+
+### CREATING DATAFRAME % of Agreement ##########################################
+
+VPsoftware <- c('AMELIE','Exomiser', 'LIRICAL', 'XRare')
+
+percent <- c(amelie_perc,exomiser_perc,lirical_perc,xrare_perc)
+
+percenttable <- data.frame(VPsoftware, percent)
+percenttable
+
+# save table as csv
+write.csv(percenttable, "percentageofagreementtable.csv")
