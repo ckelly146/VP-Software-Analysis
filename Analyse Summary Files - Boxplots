@@ -1,0 +1,116 @@
+#### BOXPLOTS
+# import libraries
+library(tidyverse) # for ggplot2
+library(MuMIn)
+
+
+### import summary data
+# import amelie summary
+amelie <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/AMELIE/output_processing/ameliesummary.csv", header = TRUE)
+# import exomiser summary
+exomiser <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/Exomiser/output_processing_exomiser/exomisersummary.csv", header = TRUE)
+# import lirical summary
+lirical <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output_processing/liricalsummary.csv", header = TRUE)
+# import phenix summary
+phenix <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/Exomiser/output_processing_phenix/phenixsummary.csv", header = TRUE)
+# import xrare summary
+xrare <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/XRare/output_processing/xraresummary.csv", header = TRUE)
+
+
+### found vs not found table
+## not that important; make the melted data table
+
+
+### summary data table (table 4)
+
+# VP software
+VP_Software <- c('AMELIE','Exomiser', 'LIRICAL','PhenIX', 'XRare')
+
+# variants not found
+FONP <- c(sum(amelie$highestRankingcategories == "FILTERED_OUT"), sum(exomiser$highestRankingcategories == "FILTERED_OUT"), sum(lirical$highestRankingcategories == "FILTERED_OUT"), sum(phenix$highestRankingcategories == "FILTERED_OUT"), sum(xrare$rankOfVariant == "8888"))
+
+# remove variants not found
+amelie <- amelie[!grepl('FILTERED_OUT', amelie$highestRankingcategories),]
+exomiser <- exomiser[!grepl('FILTERED_OUT', exomiser$highestRankingcategories),]
+lirical <- lirical[!grepl('FILTERED_OUT', lirical$highestRankingcategories),]
+phenix <- phenix[!grepl('FILTERED_OUT', phenix$highestRankingcategories),]
+xrare <- xrare[!grepl('FILTERED_OUT', xrare$highestRankingcategories),]
+
+# means
+means <- c(mean(amelie$correct_gene_rank), mean(exomiser$highestRanking), mean(lirical$highestRanking), mean(phenix$highestRanking), mean(xrare$rankOfVariant))
+
+# round means to 2 dp
+means <- means %>%
+      round(2)
+
+# standard deviations
+sds <- c(sd(amelie$correct_gene_rank), sd(exomiser$highestRanking), sd(lirical$highestRanking), sd(phenix$highestRanking), sd(xrare$rankOfVariant))
+
+# round sd to 2 dp
+sds <- sds %>%
+  round(2)
+
+# medians
+med <- c(median(amelie$correct_gene_rank), median(exomiser$highestRanking), median(lirical$highestRanking), median(phenix$highestRanking), median(xrare$rankOfVariant))
+
+# min median
+min.rank <- c(min(amelie$correct_gene_rank), min(exomiser$highestRanking), min(lirical$highestRanking), min(phenix$highestRanking), min(xrare$rankOfVariant))
+
+# max median
+max.rank <- c(max(amelie$correct_gene_rank), max(exomiser$highestRanking), max(lirical$highestRanking), max(phenix$highestRanking), max(xrare$rankOfVariant))
+
+# top rank
+top.rank <- c((sum(amelie$highestRankingcategories == "1_TOP")*100)/132, (sum(exomiser$highestRankingcategories == "1_TOP")*100)/132, (sum(lirical$highestRankingcategories == "1_TOP")*100)/132,
+              (sum(phenix$highestRankingcategories == "1_TOP")*100)/132, (sum(xrare$highestRankingcategories == "1_TOP")*100)/132)
+
+# round top rank to 2 dp
+top.rank <- top.rank %>%
+  round(2)
+
+# putting dataframe together
+df <- data.frame(VP_Software, FONP, means, sds, med, min.rank, max.rank, top.rank)
+
+write.csv(df, "/data/WHRI-Phenogenomics/projects/Catherine/stats_analysis/stats_1_summarytable4.csv")
+
+### boxplot
+
+### prepping data for boxplots
+# create dataframe from default data (which is of different length data)
+Exomiser <- data.frame(exomiser$highestRanking)
+
+# add lirical data and add to dataframe
+LIRICAL <- lirical$highestRanking
+Exomiser$LIRICAL <- c(LIRICAL, rep(NA, nrow(Exomiser)-length(LIRICAL)))
+
+# add PHENIX data and add to dataframe
+PhenIX <- phenix$highestRanking
+Exomiser$PhenIX <- c(PhenIX, rep(NA, nrow(Exomiser)-length(PhenIX)))
+
+# add xrare data and add to dataframe
+XRare <- xrare$rankOfVariant
+Exomiser$XRare <- c(XRare, rep(NA, nrow(Exomiser)-length(XRare)))
+
+# add AMELIE data and add to dataframe
+AMELIE <- amelie$correct_gene_rank
+Exomiser$AMELIE <- c(AMELIE, rep(NA, nrow(Exomiser)-length(AMELIE)))
+
+# rename exomiser column
+names(Exomiser)[names(Exomiser)=="exomiser.highestRanking"] <- "Exomiser"
+
+# order columns by alphabetical order
+data <- Exomiser[,order(colnames(Exomiser))]
+
+# ggplot2
+data_long <- pivot_longer(data, cols = c("AMELIE", "Exomiser", "LIRICAL", "PhenIX", "XRare"))
+
+#jpeg(file="stats_1_ggboxplot.jpeg")
+
+ggplot(data_long, aes(x=name, y=value, fill=name)) + geom_boxplot(show.legend = FALSE) +
+  scale_fill_brewer(palette = "Set2") +
+  labs(y="Rank", # title="Boxplot showing the ranking range by VP Software for correct diagnosed variants",
+  fill='VP Software', x = 'VP Software') + theme(plot.title = element_text(size=10))+
+  theme_minimal()
+
+ggsave(filename = "stats_1_ggboxplot.pdf", units = "in", width = 5, height = 3.5, dpi=300)
+
+#dev.off()
