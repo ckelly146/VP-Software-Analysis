@@ -222,7 +222,6 @@ kappatable
 # save table as csv
 write.csv(kappatable, "kappatable.csv")
 
-
 ### Stuart-Maxwell Test ########################################################
 
 # another nonparametric homogeneity test but this time using p values rather
