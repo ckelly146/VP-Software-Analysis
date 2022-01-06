@@ -18,7 +18,7 @@ rocrank = []
 rocfile = []
 
 for file in filenames['eid']:
-    path = '/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output/phenopacket_vcf_output/tsv/'+'CK_LIRICAL_PHENO_VCF_'+file+'.json.tsv'
+    path = 'CK_LIRICAL_PHENO_VCF_'+file+'.json.tsv'
     jsonfile = pd.read_csv(path,delimiter="\t", skiprows=t[number]+3)
 
 ## CLEANING LIRICAL OUTPUT FILES
@@ -123,7 +123,7 @@ counter = 0
 for file in filenames['eid']:
 
     # import cleaned LIRICAL  file
-    path = '/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output_processing/'+ file +'_LIRICAL_processed.csv'
+    path = file +'_LIRICAL_processed.csv'
     LIRICAL = pd.read_csv(path)
 
     for row in LIRICAL['variants_pathog']: # cleanest column
@@ -217,7 +217,7 @@ name1 = [] # patient filenames containing variant 1
 name2 = [] # patient filenames containing variant 2
 
 for file in eid_comphet: # only comphet files are looked at
-    path = '/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output_processing/'+ file +'_LIRICAL_processed.csv'
+    path = file +'_LIRICAL_processed.csv'
     comphet = pd.read_csv(path,delimiter=",",header = 0,engine='python')
 
     correctvar1 = filenames[filenames['eid'] == (file)]['HGVS1_chrom'].item() # correct diagnosed variants
