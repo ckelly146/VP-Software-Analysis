@@ -1,5 +1,6 @@
 install.packages(c("fmsb",'DescTools'), repos = 'https://cran.ma.imperial.ac.uk/')
 
+## Exomiser, PhenIX, XRare and AMELIE are other software I am testing
 
 ### Import data ################################################################
 
