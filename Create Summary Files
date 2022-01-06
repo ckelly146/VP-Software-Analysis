@@ -3,7 +3,7 @@ import re
 import numpy as np
 
 # to reference the filenames and hpo ids
-filenames = pd.read_csv('/data/WHRI-Phenogenomics/projects/Catherine/master.csv', delimiter=",")
+filenames = pd.read_csv('master.csv', delimiter=",")
 
 # in master file column 'hpoamelie', there is 1 ':' for each HPO IDs so can count
 # them to determine number of HPO IDs for each vcf, and therefore how many lines
