@@ -6,15 +6,15 @@ library(MuMIn)
 
 ### import summary data
 # import amelie summary
-amelie <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/AMELIE/output_processing/ameliesummary.csv", header = TRUE)
+amelie <- read.csv(file = "ameliesummary.csv", header = TRUE)
 # import exomiser summary
-exomiser <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/Exomiser/output_processing_exomiser/exomisersummary.csv", header = TRUE)
+exomiser <- read.csv(file = "exomisersummary.csv", header = TRUE)
 # import lirical summary
-lirical <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output_processing/liricalsummary.csv", header = TRUE)
+lirical <- read.csv(file = "liricalsummary.csv", header = TRUE)
 # import phenix summary
-phenix <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/Exomiser/output_processing_phenix/phenixsummary.csv", header = TRUE)
+phenix <- read.csv(file = "phenixsummary.csv", header = TRUE)
 # import xrare summary
-xrare <- read.csv(file = "/data/WHRI-Phenogenomics/projects/Catherine/XRare/output_processing/xraresummary.csv", header = TRUE)
+xrare <- read.csv(file = "xraresummary.csv", header = TRUE)
 
 
 ### found vs not found table
@@ -70,7 +70,7 @@ top.rank <- top.rank %>%
 # putting dataframe together
 df <- data.frame(VP_Software, FONP, means, sds, med, min.rank, max.rank, top.rank)
 
-write.csv(df, "/data/WHRI-Phenogenomics/projects/Catherine/stats_analysis/stats_1_summarytable4.csv")
+write.csv(df, "stats_1_summarytable4.csv")
 
 ### boxplot
 
@@ -103,8 +103,6 @@ data <- Exomiser[,order(colnames(Exomiser))]
 # ggplot2
 data_long <- pivot_longer(data, cols = c("AMELIE", "Exomiser", "LIRICAL", "PhenIX", "XRare"))
 
-#jpeg(file="stats_1_ggboxplot.jpeg")
-
 ggplot(data_long, aes(x=name, y=value, fill=name)) + geom_boxplot(show.legend = FALSE) +
   scale_fill_brewer(palette = "Set2") +
   labs(y="Rank", # title="Boxplot showing the ranking range by VP Software for correct diagnosed variants",
@@ -112,5 +110,3 @@ ggplot(data_long, aes(x=name, y=value, fill=name)) + geom_boxplot(show.legend = 
   theme_minimal()
 
 ggsave(filename = "stats_1_ggboxplot.pdf", units = "in", width = 5, height = 3.5, dpi=300)
-
-#dev.off()
