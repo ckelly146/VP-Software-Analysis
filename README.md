@@ -1,6 +1,6 @@
 # VP-Software-Analysis
 
-Example of code
+Examples of code
 
 For LIRICAL (1 of the 5 VP Software I am testing), the pipeline is as follows:
 
