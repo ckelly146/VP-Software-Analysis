@@ -1,0 +1,49 @@
+#!/bin/sh
+#$ -o /dev/null
+#$ -e /dev/null
+#$ -cwd
+#$ -pe smp 6       # request n CPU core
+#$ -l h_vmem=4G    # request x Gb RAM / core
+#$ -l h_rt=5:0:0  # request x hours runtime
+
+# script filename
+scriptname="LIRICAL_PHENO_RUN_VCFHPO"
+# genome build
+build="b37"
+# choose wgs/wes
+wgswes="wes"
+# data folder; choose UCLex/NCMD/RDS
+dataset="UCLex"
+
+# software version
+version="1.3.3"
+
+# create output and error folders (p lets you create subdirectories)
+mkdir -p ${scriptname}.qsub.out ${scriptname}.qsub.err
+exec >${scriptname}.qsub.out/${scriptname}_${SGE_TASK_ID}_${JOB_ID}.out 2>${scriptname}.qsub.err/${scriptname}_${SGE_TASK_ID}_${JOB_ID}.err
+
+# output folder
+output=/phenopacket_vcf_output
+
+# executable
+LIRICAL=LIRICAL.jar
+
+# exomiser data
+exomdata=/exomiser/data/2102_hg19/
+
+phenopacketfile=/LIRICAL_PHENOPACKET/phenopackets/VCFandHPO
+
+# prefix
+prefix=CK_LIRICAL_PHENO_VCF_
+
+for pheno in $phenopacketfile/*
+
+  do
+
+    # ------ Run LIRICAL -------
+
+    # allows for tsv output as well
+    echo java -jar ${LIRICAL} phenopacket -p ${pheno} -e ${exomdata} -x "${prefix}$(basename "$pheno")" --tsv --output-directory ${output}
+   java -jar ${LIRICAL} phenopacket -p ${pheno} -e ${exomdata} -x "${prefix}$(basename "$pheno")" --tsv --output-directory ${output}
+
+done
