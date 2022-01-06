@@ -1,0 +1,264 @@
+import pandas as pd
+import re
+import numpy as np
+
+# to reference the filenames and hpo ids
+filenames = pd.read_csv('/data/WHRI-Phenogenomics/projects/Catherine/master.csv', delimiter=",")
+
+# in master file column 'hpoamelie', there is 1 ':' for each HPO IDs so can count
+# them to determine number of HPO IDs for each vcf, and therefore how many lines
+# (+3) to skip in the LIRICAL output files
+t = [] # list containing number of lines to skip for each file in order of file name
+for file in filenames['hpoamelie']:
+    t.append(len(re.findall(r"\:",file)))
+
+number = 0 # counter for the t list
+rocvar = [] # for roc summary
+rocrank = []
+rocfile = []
+
+for file in filenames['eid']:
+    path = '/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output/phenopacket_vcf_output/tsv/'+'CK_LIRICAL_PHENO_VCF_'+file+'.json.tsv'
+    jsonfile = pd.read_csv(path,delimiter="\t", skiprows=t[number]+3)
+
+## CLEANING LIRICAL OUTPUT FILES
+
+    # drop duplicates in 'variants' column, keeping only first
+    # to account for lirical going by different diseases caused by same variant
+    jsonfile = jsonfile.drop_duplicates(subset = ['variants'])
+
+
+    # separate out 'variants' column at semi colon into a list of each variant
+    newcolumn = []
+    for row in jsonfile['variants']:
+        var = row.split(';')
+        newcolumn.append(var)
+    jsonfile['variants_split'] = newcolumn # add new separated column to file
+
+
+    # the moi of the disease of the patient is:
+    actual_moi = filenames[filenames['eid']==(file)]['moi_CK'].item()
+    if actual_moi == '0/1':
+        lirical_moi = '[HETEROZYGOUS]'
+    elif actual_moi == '1/1':
+        lirical_moi = '[HOMOZYGOUS_ALT]'
+
+    # create new column excluding variants with incorrect moi
+    # keep in 'NOT_OBSERVED'
+    newmoi_col = []
+    for row in jsonfile['variants_split']:
+        for var in row:
+            if str(lirical_moi) in var: # if match for variant
+                newmoi_col.append(var) # add to new column
+            elif 'NOT_OBSERVED' in var:
+                newmoi_col.append(var)
+        newmoi_col.append(';') # add a semi colon everytime there is a new row
+    strcol = ''.join(newmoi_col) # join list back together (python not happy with
+                                # re seperating out a list when still a list)
+    sep_strcol = strcol.split(';') # reformat list based on new rows
+    del sep_strcol[-1] # corrects for length, removes added ;
+    jsonfile['variants_moi'] = sep_strcol # create new column
+
+
+    # prep for removal of pathog < 0.8 (separating out variants into list again)
+    re_seplist = []
+    for row in jsonfile['variants_moi']:
+        var = row.split(']')
+        re_seplist.append(var)
+    jsonfile['variants_temp'] = re_seplist # add new separated column to file
+
+    # removal of variants with pathog < 0.8
+    pathogcol = []
+    for row in jsonfile['variants_temp']:
+        for var in row:
+            if 'pathogenicity:1.0' in var:
+                pathogcol.append(var)
+            elif 'pathogenicity:0.9' in var:
+                pathogcol.append(var)
+            elif 'pathogenicity:0.8' in var:
+                pathogcol.append(var)
+            else:
+                pathogcol.append(', NaN')
+        pathogcol.append(';') # add a semi colon everytime there is a new row
+    pathogcol = ''.join(pathogcol) # join list back together
+    pathogcol = pathogcol.split(';') # reformat list based on new rows
+    del pathogcol[-1] # corrects for length, removes added ;
+    jsonfile['variants_pathog'] = pathogcol # create new column
+
+
+    # ranking by compositeLR column
+    # remove comma and convert to float first
+    jsonfile['compositeLR'] = jsonfile['compositeLR'].replace(',','', regex=True)
+    jsonfile['compositeLR'] = jsonfile['compositeLR'].astype(float)
+    jsonfile['rank'] = jsonfile['compositeLR'].rank(ascending=False, pct = False)
+
+
+    # note length of file for roc summary (used later on)
+    for var in jsonfile['variants']: # used as an identifier in roc summary
+        rocvar.append(var)
+    for rank in jsonfile['rank']: # ranks of variants from 1 to end of file
+        rocrank.append(rank)
+    rocfile.extend([file for i in range(len(jsonfile))])
+
+    number +=1 # for next file
+    # save file
+    savename = file+'_LIRICAL_processed.csv'
+    jsonfile.to_csv(savename)
+
+
+## SUMMARISING OUTPUT FILES
+
+# create table for roc summary
+titles = {'file':rocfile,'listofvars':rocvar,'rank':rocrank}
+roctable = pd.DataFrame(titles, columns= ['file','listofvars','rank'])
+roctable ['correct'] = 0 # use as a placeholder for all rows/variants
+
+### now to check if variants in each patient output are a match
+
+# make a table to append rows to for summarising output files
+titles = {'samplename':[],'rankOfVariant':[],'variant':[]}
+outputdf = pd.DataFrame(titles, columns= ['samplename','rankOfVariant', 'variant'])
+
+counter = 0
+for file in filenames['eid']:
+
+    # import cleaned LIRICAL  file
+    path = '/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output_processing/'+ file +'_LIRICAL_processed.csv'
+    LIRICAL = pd.read_csv(path)
+
+    for row in LIRICAL['variants_pathog']: # cleanest column
+
+        # check for if diagnosed variant 1 appears in variants_pathog row
+        if str(filenames[filenames['eid']==(file)]['HGVS1_chrom'].item()) in row:
+
+            samplename = file
+            rankOfVariant = LIRICAL[LIRICAL['variants_pathog']==(row)]['rank'].tolist()
+            variant = filenames[filenames['eid']==(file)]['HGVS1_chrom'].item()
+
+            # if match, add row to table
+            outputdf.loc[len(outputdf.index)] = [samplename, rankOfVariant, variant]
+
+            # next round, go the next sample
+            break
+
+        # check for case that diagnosed variant 2 appears in variants_pathog.
+        # not really relevant - at end comphet disease patients without both matching
+        # variants are discarded anyway
+        elif str(filenames[filenames['eid']==(file)]['HGVS2_chrom'].item()) in row:
+
+            samplename = file
+            rankOfVariant = LIRICAL[LIRICAL['variants_pathog']==(row)]['rank'].tolist()
+            variant = filenames[filenames['eid']==(file)]['HGVS2_chrom'].item()
+
+            # if match, add row to table
+            outputdf.loc[len(outputdf.index)] = [samplename, rankOfVariant, variant]
+
+            # next round, go the next sample
+            break
+
+        else:
+            continue
+        counter += 1
+
+
+# check for files that don't rank by lirical - to make all summary files add to 132 outputs
+
+samplenameOUTPUT = []
+for name in outputdf['samplename']:
+    samplenameOUTPUT.append(name) # files ranked by lirical
+
+actualsample = []
+for name in filenames['eid']:
+    actualsample.append(name) # all files possible to be ranked from master file
+
+notinList = []
+for sample in actualsample:
+    if sample not in samplenameOUTPUT:
+        notinList.append(sample) # link of files not ranked by lirical
+
+# add unranked files to bottom of list with standard values
+for x in notinList:
+    samplename = x
+    rankOfVariant = [8888]
+    variant = 'NaN'
+
+    outputdf.loc[len(outputdf.index)] = [samplename, rankOfVariant, variant]
+
+
+# create a column for rank of variants column reading categorical terms
+
+highest_ranking = []
+for x in outputdf['rankOfVariant']:
+    highest_ranking.append(x[0])
+outputdf['highestRanking'] = highest_ranking # new column without square brackets
+
+outputdf['highestRankingcategories'] = outputdf['highestRanking'] # placeholder column
+conditions = [
+    (outputdf['highestRankingcategories'] == 1),
+    (outputdf['highestRankingcategories'] > 1) & (outputdf['highestRankingcategories'] < 6),
+    (outputdf['highestRankingcategories'] > 5) & (outputdf['highestRankingcategories'] < 11),
+    (outputdf['highestRankingcategories'] > 10) & (outputdf['highestRankingcategories'] < 299),
+    (outputdf['highestRankingcategories'] > 300 )
+    ]
+values = ['1_TOP','2_5','6_10','ABOVE_10','FILTERED_OUT']
+outputdf['highestRankingcategories'] = np.select(conditions, values) # change value to condition
+
+outputdf = outputdf.sort_values('samplename') # sort
+
+
+# check comphet disease patient files for both variant matches
+
+eid_comphet = []
+for x in filenames['eid']:
+    if filenames[filenames['eid']==(x)]['solvedgenotype'].item() == 'compHET':
+        eid_comphet.append(x) # list of comphet filenames
+
+name1 = [] # patient filenames containing variant 1
+name2 = [] # patient filenames containing variant 2
+
+for file in eid_comphet: # only comphet files are looked at
+    path = '/data/WHRI-Phenogenomics/projects/Catherine/LIRICAL/output_processing/'+ file +'_LIRICAL_processed.csv'
+    comphet = pd.read_csv(path,delimiter=",",header = 0,engine='python')
+
+    correctvar1 = filenames[filenames['eid'] == (file)]['HGVS1_chrom'].item() # correct diagnosed variants
+    correctvar2 = filenames[filenames['eid'] == (file)]['HGVS2_chrom'].item()
+
+    for x in comphet['variants_pathog']:
+        if correctvar1 in x:
+            name1.append(file) # all patient filenames containing variant 1
+
+        if correctvar2 in x:
+            name2.append(file) # all patient filenames containing variant 2
+
+del1 = []
+for x in name1:
+    if x not in name2:
+        del1.append(x)
+
+del2 = []
+for x in name2:
+    if x not in name1:
+        del2.append(x)
+
+comphetremove = del1 + del2 # comphet patients without both variants
+
+for x in comphetremove: # changes all ranked files in the summary to standard values
+    outputdf = outputdf.drop(outputdf.loc[outputdf['samplename']==x].index)
+    new_row ={'samplename':x,'rankOfVariant':[8888],'variant':'NaN','highestRanking':8888,'highestRankingcategories':'FILTERED_OUT'}
+    outputdf = outputdf.append(new_row,ignore_index = True)
+
+outputdf = outputdf.sort_values('samplename') # sorts
+
+outputdf.to_csv('liricalsummary.csv') # up to date summary file filtered for moi and pathog
+
+
+# now to update the roc summary with all info
+# (placeholder of 0 is in correct column for all variants currently)
+
+for fi in outputdf['samplename']:
+    if outputdf[outputdf['samplename']==(fi)]['highestRankingcategories'].item() != 'FILTERED_OUT': # all that aren't FO
+        val = outputdf[outputdf['samplename']==(fi)]['highestRanking'].item() # take the numbered rank
+        roctable.loc[(roctable['file'] == fi) & (roctable['rank'] == val), ['correct']] = 1 # replaces roc 0 with 1 if there was a match
+
+
+roctable.to_csv('liricalroc.csv') # saves roc summary
