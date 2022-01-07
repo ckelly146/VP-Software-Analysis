@@ -57,7 +57,7 @@ for file in master['eid']: # loop through all master files
             rank_match = amelie_table[amelie_table['gene']==(diag_gene)]['rank'].item()
             outputdf.loc[len(outputdf.index)] = [file, rank_match, diag_gene]
 
-            # replaces roc 1 with 0 to fix for comphet non full matches
+            # replaces roc 0 with 1 if match
             amelie_table.loc[(amelie_table['gene'] == diag_gene), ['correct']] = 1
 
             break
