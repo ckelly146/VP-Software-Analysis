@@ -1,0 +1,100 @@
+# AMELIE is a different software that requires far less manipulative processing. 
+
+import pandas as pd
+import numpy as np
+import json
+
+# get names of files
+master = pd.read_csv('master.csv',delimiter=",")
+master = master.sort_values('eid')
+
+# create summary file to append rows to
+summ_titles = {'samplename':[],'correct_gene_rank':[],'gene':[]}
+outputdf = pd.DataFrame(summ_titles, columns= ['samplename','correct_gene_rank', 'gene'])
+
+names = [] # for use in roc summary
+gene_names = []
+gene_ranks = []
+blank = []
+
+for file in master['eid']: # loop through all master files
+
+    path = 'AMELIE/' + file + '.json'
+    f = open(path,)
+    data = json.load(f) # returns JSON object as a dictionary
+
+    # separate into gene names and rest of data
+    gene_name = []
+    scores = []
+    for x in data:
+        gene_name.append(x[0])
+        scores.append(x[1])
+
+    # just taking the highest score row for each gene
+    scores_1st = []
+    for x in scores:
+        scores_1st.append(x[0])
+
+    # separate 1st row into pmid and score for the paper
+    publication = []
+    amelie_score = []
+    for x in scores_1st:
+        publication.append(x[0])
+        amelie_score.append(x[1])
+
+    # create cleaner table from data, and rank, and 0s for roc summary
+    titles = {'gene':gene_name,'pmid':publication,'amelie_score':amelie_score}
+    amelie_table = pd.DataFrame(titles, columns = ['gene','pmid','amelie_score'])
+    amelie_table['rank'] = amelie_table['amelie_score'].rank(ascending=False, pct = False)
+    amelie_table['correct'] = 0
+
+    # get correct gene from master file
+    diag_gene = master[master['eid']==(file)]['gene'].item()
+
+    # add row to summary file
+    for ge in amelie_table['gene']:
+        if diag_gene == ge:
+            rank_match = amelie_table[amelie_table['gene']==(diag_gene)]['rank'].item()
+            outputdf.loc[len(outputdf.index)] = [file, rank_match, diag_gene]
+
+            # replaces roc 1 with 0 to fix for comphet non full matches
+            amelie_table.loc[(amelie_table['gene'] == diag_gene), ['correct']] = 1
+
+            break
+
+        else: # add standardised terms if no match
+            samplename = file
+            rankOfVariant = 8888
+            variant = 'NaN'
+            outputdf.loc[len(outputdf.index)] = [samplename, rankOfVariant, variant]
+            break
+
+    # create lists to add to roc summary file
+    for x in amelie_table['gene']:
+        names.append(file)
+        gene_names.append(x)
+        gene_ranks.append(amelie_table[amelie_table['gene']==(x)]['rank'].item())
+        blank.append(amelie_table[amelie_table['gene']==(x)]['correct'].item())
+
+# add categories
+outputdf['highestRankingcategories'] = outputdf['correct_gene_rank'] # placeholder
+
+conditions = [
+    (outputdf['highestRankingcategories'] == 1),
+    (outputdf['highestRankingcategories'] > 1) & (outputdf['highestRankingcategories'] < 6),
+    (outputdf['highestRankingcategories'] > 5) & (outputdf['highestRankingcategories'] < 11),
+    (outputdf['highestRankingcategories'] > 10) & (outputdf['highestRankingcategories'] < 299),
+    (outputdf['highestRankingcategories'] > 300 )
+    ]
+
+values = ['1_TOP','2_5','6_10','ABOVE_10','FILTERED_OUT']
+# convert placeholder to conditions
+outputdf['highestRankingcategories'] = np.select(conditions, values)
+
+outputdf.to_csv('ameliesummary.csv') # save amelie summary
+
+# create roc summary file to append rows to
+roc_titles = {'file':names,'gene':gene_names,'rank':gene_ranks,'correct':blank}
+rocdf = pd.DataFrame(roc_titles, columns= ['file','gene','rank', 'correct'])
+
+rocdf.to_csv('amelieroc.csv') # save roc summary
